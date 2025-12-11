@@ -589,7 +589,7 @@ var vm = new Vue({
       if (confirm('Are you sure you want to delete ' + folder.title + '?')) {
         api.folders.delete(folder.id).then(function() {
           vm.feedSelected = null
-          vm.itemSelected = null
+          vm.selectFeed()
           vm.refreshStats()
           vm.refreshFeeds()
         })
@@ -615,7 +615,7 @@ var vm = new Vue({
       if (confirm('Are you sure you want to delete ' + feed.title + '?')) {
         api.feeds.delete(feed.id).then(function() {
           vm.feedSelected = null
-          vm.itemSelected = null
+          vm.selectFeed()
           vm.refreshStats()
           vm.refreshFeeds()
         })
@@ -637,7 +637,7 @@ var vm = new Vue({
           vm.refreshStats()
           vm.settings = ''
           vm.feedSelected = 'feed:' + result.feed.id
-          vm.itemSelected = null
+          vm.selectFeed()
         } else if (result.status === 'multiple') {
           vm.feedNewChoice = result.choice
           vm.feedNewChoiceSelected = result.choice[0].url
@@ -808,7 +808,7 @@ var vm = new Vue({
 
       if (currentFeedPosition == -1) {
         vm.feedSelected = ''
-        vm.itemSelected = null
+        vm.selectFeed()
         return
       }
 
@@ -816,7 +816,7 @@ var vm = new Vue({
       if (newPosition < 0 || newPosition >= navigationList.length) return
 
       vm.feedSelected = navigationList[newPosition]
-      vm.itemSelected = null
+      vm.selectFeed()
 
       vm.$nextTick(function() {
         var scroll = document.querySelector('#feed-list-scroll')
@@ -864,7 +864,17 @@ var vm = new Vue({
       if (fe !== nfe || it !== nit || fi !== nfi) {
         history.pushState(newState, "", url)
       }
-    }
+    },
+    selectFeed: function() {
+      this.itemSelected = null
+      this.items.length = 0
+      this.itemsHasMore = true
+    },
+    selectFilter: function() {
+      this.itemSelected = null
+      this.items.length = 0
+      this.itemsHasMore = true
+    },
   }
 })
 
