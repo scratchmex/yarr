@@ -66,14 +66,17 @@ var shortcutFunctions = {
   showAll() {
     vm.filterSelected = ''
     vm.selectFilter()
+    vm.navigateToFeed(0)
   },
   showUnread() {
     vm.filterSelected = 'unread'
     vm.selectFilter()
+    vm.navigateToFeed(0)
   },
   showStarred() {
     vm.filterSelected = 'starred'
     vm.selectFilter()
+    vm.navigateToFeed(0)
   },
   focusItems() {
     vm.navigateToItem(0)
