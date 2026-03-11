@@ -1,5 +1,11 @@
 # upcoming
 
+- (fix) articles not resetting immediately after feed/filter selection (thank to @scratchmex for the report)
+- (fix) crash on empty article list with article is selected (thanks to @rksvc)
+- (fix) invalid article title in RSS feeds with media containing titles (thanks to @bwwu-git for the report)
+
+# v2.6 (2025-11-24)
+
 - (new) serve on unix socket (thanks to @rvighne)
 - (new) more auto-refresh options: 12h & 24h (thanks to @aswerkljh for suggestion)
 - (fix) smooth scrolling on iOS (thanks to gatheraled)

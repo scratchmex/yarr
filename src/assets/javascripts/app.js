@@ -371,12 +371,18 @@ var vm = new Vue({
     'filterSelected': function(newVal, oldVal) {
       if (oldVal === undefined) return  // do nothing, initial setup
       this.historyChange(this.feedSelected, this.itemSelected, newVal)
+      this.itemSelected = null
+      this.items = []
+      this.itemsHasMore = true
       api.settings.update({filter: newVal}).then(this.refreshItems.bind(this, false))
       this.computeStats()
     },
     'feedSelected': function(newVal, oldVal) {
       if (oldVal === undefined) return  // do nothing, initial setup
       this.historyChange(newVal, this.itemSelected, this.filterSelected)
+      this.itemSelected = null
+      this.items = []
+      this.itemsHasMore = true
       api.settings.update({feed: newVal}).then(this.refreshItems.bind(this, false))
       if (this.$refs.itemlist) this.$refs.itemlist.scrollTop = 0
     },
