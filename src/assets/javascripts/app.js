@@ -202,6 +202,8 @@ Vue.component('relative-time', {
   },
 })
 
+Vue.use(i18n)
+
 var vm = new Vue({
   created: function() {
     this.refreshStats()
@@ -212,6 +214,7 @@ var vm = new Vue({
       vm.feed_errors = errors
     })
     this.updateMetaTheme(app.settings.theme_name)
+    this.$setLang(app.settings.language)
   },
   mounted: function() {
     addEventListener("popstate", (event) => { return this.loadHistory(event.state) })
@@ -278,6 +281,13 @@ var vm = new Vue({
         { title: "12h", value: 720 },
         { title: "24h", value: 1440 },
       ],
+
+      'language': s.language,
+      'languages': [
+        {code: 'en', name: 'English' },
+        {code: 'zh', name: '简体中文'},
+        {code: 'ru', name: 'Русский'},
+      ]
     }
   },
   computed: {
@@ -884,6 +894,11 @@ var vm = new Vue({
       this.itemSelected = null
       this.items.length = 0
       this.itemsHasMore = true
+    },
+    changeLanguage(lang) {
+      this.$setLang(lang)
+      this.language = lang
+      api.settings.update({language: lang})
     },
   }
 })
