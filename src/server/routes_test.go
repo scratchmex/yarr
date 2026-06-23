@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/nkanaev/yarr/src/storage"
+	"github.com/nkanaev/yarr/src/storage/model"
 )
 
 func TestStatic(t *testing.T) {
@@ -79,8 +80,8 @@ func TestFeedIcons(t *testing.T) {
 	log.SetOutput(io.Discard)
 	db, _ := storage.New(":memory:")
 	icon := []byte("test")
-	feed := db.CreateFeed("", "", "", "", nil)
-	db.UpdateFeedIcon(feed.Id, &icon)
+	feed := db.CreateFeed(model.CreateFeedParams{})
+	db.UpdateFeed(feed.Id, model.UpdateFeedParams{Icon: model.SetNullable(&icon)})
 	log.SetOutput(os.Stderr)
 
 	recorder := httptest.NewRecorder()
