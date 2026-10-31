@@ -564,14 +564,11 @@ type ThemeFont = "" | "serif" | "monospace";
 type Filter = "" | "starred" | "unread";
 type HistoryState = { fe: string | null; it: number | null; fi: Filter };
 
-function isHistoryState(state: unknown): state is HistoryState {
-  if (!state || typeof state !== "object") return false;
-  const { fe, it, fi } = state as Partial<HistoryState>;
-  return (
-    (fe === null || fe === "" || (typeof fe === "string" && /^(feed|folder):\d+$/.test(fe))) &&
-    (it === null || (typeof it === "number" && Number.isSafeInteger(it) && it > 0)) &&
-    (fi === "" || fi === "unread" || fi === "starred")
-  );
+function navigationId(value: string | null): number | null {
+  if (!value || !/^\d+$/.test(value)) return null;
+  const id = Number(value);
+  if (!Number.isSafeInteger(id) || id <= 0) return null;
+  return id;
 }
 type SettingsLanguage = { code: Lang; name: string };
 type Stats = { unread: number; starred: number };
@@ -619,8 +616,7 @@ export default defineComponent({
       );
     }
 
-    this.loadHistory(history.state);
-    this.historyChange();
+    this.loadHistory();
 
     if (!feedsErr) {
       this.refreshItems(false);
@@ -1416,27 +1412,39 @@ export default defineComponent({
         if (handle && scroll) scrollto(handle, scroll);
       });
     },
-    onPopState(event: PopStateEvent) {
-      this.loadHistory(event.state);
+    onPopState() {
+      this.loadHistory();
     },
-    loadHistory(state: unknown) {
-      if (!isHistoryState(state)) return;
+    loadHistory() {
+      const params = new URLSearchParams(window.location.search);
+      const feed = navigationId(params.get("feed"));
+      const folder = navigationId(params.get("folder"));
+      const filter = params.get("filter");
       this.restoringHistory = true;
-      this.filterSelected = state.fi;
-      this.feedSelected = state.fe;
-      this.itemSelected = state.it;
+      this.feedSelected = "";
+      if (feed) this.feedSelected = `feed:${feed}`;
+      else if (folder) this.feedSelected = `folder:${folder}`;
+      this.filterSelected = filter === "unread" || filter === "starred" ? filter : "";
+      this.itemSelected = navigationId(params.get("item"));
       this.$nextTick(() => {
         this.restoringHistory = false;
+        this.historyChange(true);
       });
     },
-    historyChange() {
+    historyChange(replace = false) {
       if (this.restoringHistory) return;
       const state = this.navigationState;
-      const previous = history.state;
-      const url = `#filter:${state.fi || "all"},${state.fe || "feed:all"},item:${state.it || ""}`;
-      if (!isHistoryState(previous)) {
+      const url = new URL(window.location.href);
+      for (const name of ["feed", "folder", "filter", "item"]) url.searchParams.delete(name);
+      if (state.fe) {
+        const [type, id] = state.fe.split(":");
+        url.searchParams.set(type, id);
+      }
+      if (state.fi) url.searchParams.set("filter", state.fi);
+      if (state.it !== null) url.searchParams.set("item", String(state.it));
+      if (replace) {
         history.replaceState(state, "", url);
-      } else if (previous.fe !== state.fe || previous.it !== state.it || previous.fi !== state.fi) {
+      } else if (url.href !== window.location.href) {
         history.pushState(state, "", url);
       }
     },
