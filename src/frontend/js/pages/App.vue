@@ -168,7 +168,7 @@
           </button>
         </v-dropdown>
       </div>
-      <div id="feed-list-scroll" class="p-2 overflow-auto border-top flex-grow-1">
+      <div id="feed-list-scroll" class="p-2 overflow-auto border-top flex-grow-1" tabindex="-1">
         <v-feedtree
           :tree="feedTree"
           v-model="feedSelected"
@@ -323,6 +323,7 @@
       </div>
       <div
         id="item-list-scroll"
+        tabindex="-1"
         class="d-flex flex-column p-2 overflow-auto border-top flex-grow-1 gap-1"
         v-scroll="loadMoreItems"
         ref="itemlist">
@@ -1429,6 +1430,11 @@ export default defineComponent({
       this.$nextTick(() => {
         this.restoringHistory = false;
         this.historyChange(true);
+        const list = document.querySelector<HTMLElement>(
+          this.itemSelected === null ? "#feed-list-scroll" : "#item-list-scroll",
+        );
+        const target = list?.querySelector<HTMLElement>('[aria-checked="true"]') || list;
+        target?.focus({ preventScroll: true });
       });
     },
     historyChange(replace = false) {
