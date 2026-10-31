@@ -1,3 +1,4 @@
+export function setupKeybindings(vm) {
 var helperFunctions = {
   scrollContent: function(direction) {
     var padding = 40
@@ -153,3 +154,4 @@ document.addEventListener('keydown',function(event) {
     keybindFunction()
   }
 })
+}
