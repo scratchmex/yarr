@@ -176,6 +176,7 @@
         <v-feedtree
           :tree="feedTree"
           v-model="feedSelected"
+          @update:model-value="itemSelected = null"
           :filter-selected="filterSelected"
           :stats="stats"
           :feed-errors="feed_errors"
