@@ -329,7 +329,7 @@
         id="item-list-scroll"
         tabindex="-1"
         class="d-flex flex-column p-2 overflow-auto border-top flex-grow-1 gap-1"
-        v-scroll="onItemsScroll"
+        v-scroll="loadMoreItems"
         ref="itemlist">
         <div
           v-for="item in items"
@@ -602,6 +602,8 @@ export default defineComponent({
     focus: focusDir,
   },
   async created() {
+    // Save the outgoing viewport before selection watchers clear the list.
+    this.$watch("navigationState", this.saveScroll, { flush: "sync" });
     this.updateMetaTheme();
     this.$t.set(document.documentElement.lang as Lang);
 
@@ -989,7 +991,16 @@ export default defineComponent({
         return;
       }
 
-      if (loopMode && !this.itemSelected) this.refreshItems();
+      if (
+        loopMode &&
+        !this.itemSelected &&
+        !this.restoringHistory &&
+        !this.loading.items &&
+        this.itemScrollToRestore === null &&
+        !this.$refs.itemlist?.scrollTop
+      ) {
+        this.refreshItems();
+      }
 
       this.loading.feeds = data.running;
       this.refreshAvailable = data.refresh;
@@ -1063,6 +1074,7 @@ export default defineComponent({
       this.loading.items = false;
       if (err) {
         this.itemToReveal = null;
+        this.itemScrollToRestore = null;
         this.$refs.toast.addToast(
           { title: this.$t("fail_load"), description: this.errDescription(err) },
           { level: "fail", closeable: false },
@@ -1129,11 +1141,8 @@ export default defineComponent({
       var closeToBottom = el.scrollHeight - el.scrollTop - el.offsetHeight < bottomSpace * scale;
       return closeToBottom;
     },
-    onItemsScroll() {
-      this.saveScroll();
-      this.loadMoreItems();
-    },
     loadMoreItems() {
+      this.saveScroll();
       if (this.itemScrollToRestore !== null || this.itemToReveal !== null) return;
       if (!this.itemsHasMore) return;
       if (this.loading.items) return;
