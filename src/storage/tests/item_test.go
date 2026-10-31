@@ -366,7 +366,7 @@ func TestDeleteOldItems(t *testing.T) {
 				feed := db.CreateFeed(model.CreateFeedParams{Title: "f", FeedLink: "http://f.xml"})
 				now := time.Now()
 				items := make([]model.Item, 100)
-				for i := 0; i < 100; i++ {
+				for i := range 100 {
 					items[i] = model.Item{GUID: strconv.Itoa(i), FeedId: feed.Id, Date: now}
 				}
 				db.CreateItems(items)
@@ -391,7 +391,7 @@ func TestDeleteOldItems(t *testing.T) {
 				feed := db.CreateFeed(model.CreateFeedParams{Title: "f", FeedLink: "http://f.xml"})
 				now := time.Now()
 				items := make([]model.Item, 100)
-				for i := 0; i < 100; i++ {
+				for i := range 100 {
 					items[i] = model.Item{GUID: strconv.Itoa(i), FeedId: feed.Id, Date: now.Add(time.Duration(i) * time.Second)}
 				}
 				db.CreateItems(items)
@@ -546,7 +546,7 @@ func TestSearch(t *testing.T) {
 		}
 
 		// 5. Trigger: Update
-		db.UpdateItem(MustGet(itemsByGUID, "i1").Id, model.UpdateItemParams{Title: ptr("Updated Title")})
+		db.UpdateItem(MustGet(itemsByGUID, "i1").Id, model.UpdateItemParams{Title: new("Updated Title")})
 		s7 := "Updated"
 		have = getItemGuids(db.ListItems(model.ItemFilter{Search: &s7}, 10, true, false))
 		if !reflect.DeepEqual(have, []string{"i1"}) {
