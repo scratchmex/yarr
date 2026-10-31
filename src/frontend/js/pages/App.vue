@@ -168,7 +168,11 @@
           </button>
         </v-dropdown>
       </div>
-      <div id="feed-list-scroll" class="p-2 overflow-auto border-top flex-grow-1" tabindex="-1">
+      <div
+        id="feed-list-scroll"
+        class="p-2 overflow-auto border-top flex-grow-1"
+        tabindex="-1"
+        v-scroll="saveScroll">
         <v-feedtree
           :tree="feedTree"
           v-model="feedSelected"
@@ -325,7 +329,7 @@
         id="item-list-scroll"
         tabindex="-1"
         class="d-flex flex-column p-2 overflow-auto border-top flex-grow-1 gap-1"
-        v-scroll="loadMoreItems"
+        v-scroll="onItemsScroll"
         ref="itemlist">
         <div
           v-for="item in items"
@@ -571,6 +575,10 @@ function navigationId(value: string | null): number | null {
   if (!Number.isSafeInteger(id) || id <= 0) return null;
   return id;
 }
+function scrollOffset(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return null;
+  return value;
+}
 type SettingsLanguage = { code: Lang; name: string };
 type Stats = { unread: number; starred: number };
 
@@ -619,17 +627,16 @@ export default defineComponent({
 
     this.loadHistory();
 
-    if (!feedsErr) {
-      this.refreshItems(false);
-      this.computeStats();
-    }
+    if (!feedsErr) this.computeStats();
   },
   mounted() {
     window.addEventListener("popstate", this.onPopState);
+    window.addEventListener("pagehide", this.saveScroll);
   },
   beforeUnmount() {
     this._colorSchemeMql?.removeEventListener("change", this.updateMetaTheme);
     window.removeEventListener("popstate", this.onPopState);
+    window.removeEventListener("pagehide", this.saveScroll);
   },
   data() {
     var s = app.settings;
@@ -641,8 +648,11 @@ export default defineComponent({
       feedListWidth: s.feed_list_width || 300,
       items: [] as Item[],
       itemsHasMore: true,
+      itemsRequestId: 0,
       itemSelected: null as number | null,
-      restoringHistory: false,
+      itemToReveal: null as number | null,
+      itemScrollToRestore: null as number | null,
+      restoringHistory: true,
       itemSelectedDetails: null as Item | null,
       itemSelectedReadability: "",
       itemSearch: "",
@@ -836,7 +846,8 @@ export default defineComponent({
     },
     async filterSelected(newVal, oldVal) {
       if (oldVal === undefined) return;
-      if (!this.restoringHistory) this.itemSelected = null;
+      const restoringHistory = this.restoringHistory;
+      if (!restoringHistory) this.itemSelected = null;
       this.items = [];
       this.itemsHasMore = true;
 
@@ -848,7 +859,7 @@ export default defineComponent({
         );
         return;
       }
-      this.refreshItems(false);
+      if (!restoringHistory) this.refreshItems(false);
       this.computeStats();
     },
     async feedSelected(newVal, oldVal) {
@@ -857,7 +868,7 @@ export default defineComponent({
       this.items = [];
       this.itemsHasMore = true;
 
-      this.refreshItems(false);
+      if (!this.restoringHistory) this.refreshItems(false);
       if (this.$refs.itemlist) this.$refs.itemlist.scrollTop = 0;
 
       const [err] = await to(api.settings.update({ feed: newVal }));
@@ -869,6 +880,7 @@ export default defineComponent({
       }
     },
     async itemSelected(newVal, oldVal) {
+      if (this.itemToReveal !== newVal) this.itemToReveal = null;
       this.itemSelectedReadability = "";
       if (newVal === null) {
         this.itemSelectedDetails = null;
@@ -879,6 +891,7 @@ export default defineComponent({
       const [itemErr, item] = await to(api.items.get(newVal));
       if (this.itemSelected !== newVal) return;
       if (itemErr) {
+        this.itemToReveal = null;
         this.$refs.toast.addToast(
           { title: this.$t("fail_load"), description: this.errDescription(itemErr) },
           { level: "fail", closeable: false },
@@ -1031,9 +1044,11 @@ export default defineComponent({
       this.feeds = values[1];
     },
     async refreshItems(loadMore = false) {
+      const requestId = ++this.itemsRequestId;
       if (this.feedSelected === null) {
         this.items = [];
         this.itemsHasMore = false;
+        this.loading.items = false;
         return;
       }
 
@@ -1044,8 +1059,10 @@ export default defineComponent({
 
       this.loading.items = true;
       const [err, data] = await to(api.items.list(query));
+      if (requestId !== this.itemsRequestId) return;
       this.loading.items = false;
       if (err) {
+        this.itemToReveal = null;
         this.$refs.toast.addToast(
           { title: this.$t("fail_load"), description: this.errDescription(err) },
           { level: "fail", closeable: false },
@@ -1060,8 +1077,41 @@ export default defineComponent({
       }
       this.itemsHasMore = data.has_more;
 
-      // load more if there's some space left at the bottom of the item list.
       this.$nextTick(() => {
+        if (requestId !== this.itemsRequestId) return;
+        if (this.itemScrollToRestore !== null) {
+          const list = this.$refs.itemlist;
+          if (list?.clientHeight) {
+            if (
+              list.scrollHeight - list.clientHeight < this.itemScrollToRestore &&
+              this.itemsHasMore
+            ) {
+              this.refreshItems(true);
+              return;
+            }
+            list.scrollTop = this.itemScrollToRestore;
+          }
+          this.itemScrollToRestore = null;
+        }
+        if (this.itemToReveal !== null) {
+          if (this.items.some(item => item.id === this.itemToReveal)) {
+            this.itemToReveal = null;
+            this.navigateToItem(0);
+            return;
+          }
+          const details = this.itemSelectedDetails;
+          const excluded =
+            this.filterSelected &&
+            details?.id === this.itemToReveal &&
+            details.status !== this.filterSelected;
+          if (this.itemsHasMore && !excluded) {
+            // shortcut: restore scans preceding pages; add a seek API if large feeds make it slow.
+            this.refreshItems(true);
+            return;
+          }
+          this.itemToReveal = null;
+        }
+        // load more if there's some space left at the bottom of the item list.
         if (this.itemsHasMore && !this.loading.items && this.itemListCloseToBottom()) {
           this.refreshItems(true);
         }
@@ -1079,7 +1129,12 @@ export default defineComponent({
       var closeToBottom = el.scrollHeight - el.scrollTop - el.offsetHeight < bottomSpace * scale;
       return closeToBottom;
     },
+    onItemsScroll() {
+      this.saveScroll();
+      this.loadMoreItems();
+    },
     loadMoreItems() {
+      if (this.itemScrollToRestore !== null || this.itemToReveal !== null) return;
       if (!this.itemsHasMore) return;
       if (this.loading.items) return;
       if (this.itemListCloseToBottom()) return this.refreshItems(true);
@@ -1413,6 +1468,22 @@ export default defineComponent({
         if (handle && scroll) scrollto(handle, scroll);
       });
     },
+    saveScroll() {
+      if (this.restoringHistory || this.itemScrollToRestore !== null || this.itemToReveal !== null)
+        return;
+      const feeds = document.querySelector<HTMLElement>("#feed-list-scroll");
+      const items = this.$refs.itemlist;
+      history.replaceState(
+        {
+          ...history.state,
+          scroll: {
+            feeds: feeds?.clientHeight ? feeds.scrollTop : history.state?.scroll?.feeds || 0,
+            items: items?.clientHeight ? items.scrollTop : history.state?.scroll?.items || 0,
+          },
+        },
+        "",
+      );
+    },
     onPopState() {
       this.loadHistory();
     },
@@ -1421,20 +1492,27 @@ export default defineComponent({
       const feed = navigationId(params.get("feed"));
       const folder = navigationId(params.get("folder"));
       const filter = params.get("filter");
+      const feedScroll = scrollOffset(history.state?.scroll?.feeds);
+      this.itemScrollToRestore = scrollOffset(history.state?.scroll?.items);
       this.restoringHistory = true;
       this.feedSelected = "";
       if (feed) this.feedSelected = `feed:${feed}`;
       else if (folder) this.feedSelected = `folder:${folder}`;
       this.filterSelected = filter === "unread" || filter === "starred" ? filter : "";
       this.itemSelected = navigationId(params.get("item"));
+      this.itemToReveal = this.itemSelected;
+      if (this.itemScrollToRestore !== null) this.itemToReveal = null;
       this.$nextTick(() => {
         this.restoringHistory = false;
         this.historyChange(true);
+        const feeds = document.querySelector<HTMLElement>("#feed-list-scroll");
+        if (feeds && feedScroll !== null) feeds.scrollTop = feedScroll;
         const list = document.querySelector<HTMLElement>(
           this.itemSelected === null ? "#feed-list-scroll" : "#item-list-scroll",
         );
         const target = list?.querySelector<HTMLElement>('[aria-checked="true"]') || list;
         target?.focus({ preventScroll: true });
+        this.refreshItems(false);
       });
     },
     historyChange(replace = false) {
@@ -1449,9 +1527,11 @@ export default defineComponent({
       if (state.fi) url.searchParams.set("filter", state.fi);
       if (state.it !== null) url.searchParams.set("item", String(state.it));
       if (replace) {
-        history.replaceState(state, "", url);
+        history.replaceState({ ...history.state, ...state }, "", url);
       } else if (url.href !== window.location.href) {
+        this.itemScrollToRestore = null;
         history.pushState(state, "", url);
+        this.saveScroll();
       }
     },
     changeRefreshRate(offset: number) {
