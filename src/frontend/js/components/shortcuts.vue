@@ -24,6 +24,14 @@
         <div class="w-75">{{ $t("kb_next_prev_feed") }}</div>
       </div>
       <div class="d-flex py-1">
+        <div class="w-25"><kbd>←</kbd> <kbd>→</kbd></div>
+        <div class="w-75">{{ $t("kb_focus_lists") }}</div>
+      </div>
+      <div class="d-flex py-1">
+        <div class="w-25"><kbd>↓</kbd> <kbd>↑</kbd></div>
+        <div class="w-75">{{ $t("kb_navigate_list") }}</div>
+      </div>
+      <div class="d-flex py-1">
         <div class="w-25"><kbd>q</kbd></div>
         <div class="w-75">{{ $t("kb_close_article") }}</div>
       </div>

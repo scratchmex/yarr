@@ -3,6 +3,7 @@
     <div
       class="c-listitem d-flex user-select-none gap-2"
       role="radio"
+      tabindex="-1"
       :aria-checked="modelValue === ''"
       @click="$emit('update:modelValue', '')">
       <div class="flex-shrink-0 d-flex">
@@ -26,6 +27,7 @@
         <div
           class="c-listitem d-flex user-select-none gap-2"
           role="radio"
+          tabindex="-1"
           :aria-checked="modelValue === 'folder:' + node.folder.id"
           @click="$emit('update:modelValue', 'folder:' + node.folder.id)">
           <div class="flex-shrink-0 d-flex">
@@ -51,6 +53,7 @@
             :key="'feed:' + feedNode.feed.id"
             class="c-listitem d-flex user-select-none gap-2"
             role="radio"
+            tabindex="-1"
             :aria-checked="modelValue === 'feed:' + feedNode.feed.id"
             @click="$emit('update:modelValue', 'feed:' + feedNode.feed.id)">
             <div class="flex-shrink-0 d-flex align-items-center">
@@ -79,6 +82,7 @@
         <div
           class="c-listitem d-flex user-select-none gap-2"
           role="radio"
+          tabindex="-1"
           :aria-checked="modelValue === 'feed:' + node.feed.id"
           @click="$emit('update:modelValue', 'feed:' + node.feed.id)">
           <div class="flex-shrink-0 d-flex">

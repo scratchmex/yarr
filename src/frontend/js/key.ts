@@ -1,4 +1,4 @@
-import App from "./pages/App.vue";
+import type App from "./pages/App.vue";
 
 export function setupKeybindings(vm: InstanceType<typeof App>) {
   var helperFunctions = {
@@ -71,12 +71,22 @@ export function setupKeybindings(vm: InstanceType<typeof App>) {
     },
     showAll() {
       vm.filterSelected = "";
+      vm.navigateToFeed(0);
     },
     showUnread() {
       vm.filterSelected = "unread";
+      vm.navigateToFeed(0);
     },
     showStarred() {
       vm.filterSelected = "starred";
+      vm.navigateToFeed(0);
+    },
+    focusItems() {
+      vm.navigateToItem(0);
+    },
+    focusFeeds() {
+      vm.itemSelected = null;
+      vm.navigateToFeed(0);
     },
   };
 
@@ -99,6 +109,8 @@ export function setupKeybindings(vm: InstanceType<typeof App>) {
     "1": shortcutFunctions.showUnread,
     "2": shortcutFunctions.showStarred,
     "3": shortcutFunctions.showAll,
+    ArrowLeft: shortcutFunctions.focusFeeds,
+    ArrowRight: shortcutFunctions.focusItems,
   } as Record<string, CallableFunction>;
 
   var codebindings = {
@@ -118,6 +130,8 @@ export function setupKeybindings(vm: InstanceType<typeof App>) {
     Digit1: shortcutFunctions.showUnread,
     Digit2: shortcutFunctions.showStarred,
     Digit3: shortcutFunctions.showAll,
+    ArrowLeft: shortcutFunctions.focusFeeds,
+    ArrowRight: shortcutFunctions.focusItems,
   } as Record<string, CallableFunction>;
 
   function isTextBox(element: Element) {
@@ -148,6 +162,15 @@ export function setupKeybindings(vm: InstanceType<typeof App>) {
     // Ignore while focused on text or
     // when using modifier keys (to not clash with browser behaviour)
     if (isTextBox(event.target as Element) || event.metaKey || event.ctrlKey || event.altKey) {
+      return;
+    }
+    if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+      const list = (event.target as Element).closest("#feed-list-scroll, #item-list-scroll");
+      if (!list) return;
+      const direction = event.key === "ArrowDown" ? 1 : -1;
+      if (list.id === "feed-list-scroll") vm.navigateToFeed(direction);
+      else vm.navigateToItem(direction);
+      event.preventDefault();
       return;
     }
     var keybindFunction = keybindings[event.key] || codebindings[event.code];

@@ -539,6 +539,26 @@
     "zh": "下一个/上一个订阅",
     "ru": "следующая / предыдущая лента"
   },
+  "kb_focus_lists": {
+    "en": "focus feeds / articles",
+    "de": "Feeds / Artikel fokussieren",
+    "fr": "activer les flux / articles",
+    "es": "enfocar fuentes / artículos",
+    "ja": "フィード / 記事にフォーカス",
+    "pt": "focar feeds / artigos",
+    "zh": "聚焦订阅 / 文章",
+    "ru": "фокус на лентах / статьях"
+  },
+  "kb_navigate_list": {
+    "en": "next / previous in focused list",
+    "de": "nächster / vorheriger Eintrag in der fokussierten Liste",
+    "fr": "suivant / précédent dans la liste active",
+    "es": "siguiente / anterior en la lista enfocada",
+    "ja": "フォーカス中のリストで次 / 前へ",
+    "pt": "próximo / anterior na lista em foco",
+    "zh": "当前焦点列表中的下一项 / 上一项",
+    "ru": "следующий / предыдущий элемент активного списка"
+  },
   "kb_close_article": {
     "en": "close article",
     "de": "Artikel schließen",

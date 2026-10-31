@@ -331,6 +331,7 @@
           :key="item.id"
           class="c-listitem d-flex flex-column user-select-none"
           role="radio"
+          tabindex="-1"
           :aria-checked="itemSelected === item.id"
           @click="itemSelected = item.id">
           <div
@@ -561,6 +562,17 @@ declare module "vue" {
 type Theme = "system" | "light" | "sepia" | "night";
 type ThemeFont = "" | "serif" | "monospace";
 type Filter = "" | "starred" | "unread";
+type HistoryState = { fe: string | null; it: number | null; fi: Filter };
+
+function isHistoryState(state: unknown): state is HistoryState {
+  if (!state || typeof state !== "object") return false;
+  const { fe, it, fi } = state as Partial<HistoryState>;
+  return (
+    (fe === null || fe === "" || (typeof fe === "string" && /^(feed|folder):\d+$/.test(fe))) &&
+    (it === null || (typeof it === "number" && Number.isSafeInteger(it) && it > 0)) &&
+    (fi === "" || fi === "unread" || fi === "starred")
+  );
+}
 type SettingsLanguage = { code: Lang; name: string };
 type Stats = { unread: number; starred: number };
 
@@ -607,13 +619,20 @@ export default defineComponent({
       );
     }
 
+    this.loadHistory(history.state);
+    this.historyChange();
+
     if (!feedsErr) {
       this.refreshItems(false);
       this.computeStats();
     }
   },
+  mounted() {
+    window.addEventListener("popstate", this.onPopState);
+  },
   beforeUnmount() {
     this._colorSchemeMql?.removeEventListener("change", this.updateMetaTheme);
+    window.removeEventListener("popstate", this.onPopState);
   },
   data() {
     var s = app.settings;
@@ -626,6 +645,7 @@ export default defineComponent({
       items: [] as Item[],
       itemsHasMore: true,
       itemSelected: null as number | null,
+      restoringHistory: false,
       itemSelectedDetails: null as Item | null,
       itemSelectedReadability: "",
       itemSearch: "",
@@ -688,6 +708,9 @@ export default defineComponent({
     };
   },
   computed: {
+    navigationState(): HistoryState {
+      return { fe: this.feedSelected, it: this.itemSelected, fi: this.filterSelected };
+    },
     feedTree(): FeedTreeNode[] {
       const [rootFeeds, folderFeeds] = this.feeds.reduce(
         (acc, f) => {
@@ -780,6 +803,13 @@ export default defineComponent({
     },
   },
   watch: {
+    navigationState: {
+      // Record feed/filter changes after their watchers clear the article.
+      flush: "post",
+      handler() {
+        this.historyChange();
+      },
+    },
     theme: {
       deep: true,
       handler(theme) {
@@ -809,7 +839,7 @@ export default defineComponent({
     },
     async filterSelected(newVal, oldVal) {
       if (oldVal === undefined) return;
-      this.itemSelected = null;
+      if (!this.restoringHistory) this.itemSelected = null;
       this.items = [];
       this.itemsHasMore = true;
 
@@ -826,7 +856,7 @@ export default defineComponent({
     },
     async feedSelected(newVal, oldVal) {
       if (oldVal === undefined) return;
-      this.itemSelected = null;
+      if (!this.restoringHistory) this.itemSelected = null;
       this.items = [];
       this.itemsHasMore = true;
 
@@ -850,6 +880,7 @@ export default defineComponent({
       if (this.$refs.content) this.$refs.content.scrollTop = 0;
 
       const [itemErr, item] = await to(api.items.get(newVal));
+      if (this.itemSelected !== newVal) return;
       if (itemErr) {
         this.$refs.toast.addToast(
           { title: this.$t("fail_load"), description: this.errDescription(itemErr) },
@@ -1337,37 +1368,24 @@ export default defineComponent({
       const unread = this.stats.total.unread;
       document.title = TITLE + (unread ? ` (${unread})` : "");
     },
-    // navigation helper, navigate relative to selected item
+    // navigation helper, navigate relative to selected item; zero restores focus
     navigateToItem(relativePosition: number) {
-      let vm = this;
-      if (this.itemSelected == null) {
-        // if no item is selected, select first
-        if (this.items.length !== 0) this.itemSelected = this.items[0].id;
-        return;
-      }
-
-      var itemPosition = this.items.findIndex(x => {
-        return x.id === this.itemSelected;
-      });
-      if (itemPosition === -1) {
-        if (this.items.length !== 0) this.itemSelected = this.items[0].id;
-        return;
-      }
-
-      var newPosition = itemPosition + relativePosition;
+      var itemPosition = this.items.findIndex(x => x.id === this.itemSelected);
+      var newPosition = itemPosition === -1 ? 0 : itemPosition + relativePosition;
       if (newPosition < 0 || newPosition >= this.items.length) return;
 
       this.itemSelected = this.items[newPosition].id;
 
       this.$nextTick(() => {
         var scroll = document.querySelector("#item-list-scroll");
-        var handle = scroll?.querySelector('[aria-checked="true"]');
+        var handle = scroll?.querySelector<HTMLElement>('[aria-checked="true"]');
+        handle?.focus({ preventScroll: true });
         if (handle && scroll) scrollto(handle, scroll);
 
         this.loadMoreItems();
       });
     },
-    // navigation helper, navigate relative to selected feed
+    // navigation helper, navigate relative to selected feed; zero restores focus
     navigateToFeed(relativePosition: number) {
       const navigationList: string[] = [];
       for (const node of this.feedTree) {
@@ -1386,21 +1404,41 @@ export default defineComponent({
 
       var currentFeedPosition = navigationList.indexOf(this.feedSelected);
 
-      if (currentFeedPosition == -1) {
-        this.feedSelected = "";
-        return;
-      }
-
-      var newPosition = currentFeedPosition + relativePosition;
+      var newPosition = currentFeedPosition === -1 ? 0 : currentFeedPosition + relativePosition;
       if (newPosition < 0 || newPosition >= navigationList.length) return;
 
       this.feedSelected = navigationList[newPosition];
 
       this.$nextTick(() => {
         var scroll = document.querySelector("#feed-list-scroll");
-        var handle = scroll?.querySelector('[aria-checked="true"]');
+        var handle = scroll?.querySelector<HTMLElement>('[aria-checked="true"]');
+        handle?.focus({ preventScroll: true });
         if (handle && scroll) scrollto(handle, scroll);
       });
+    },
+    onPopState(event: PopStateEvent) {
+      this.loadHistory(event.state);
+    },
+    loadHistory(state: unknown) {
+      if (!isHistoryState(state)) return;
+      this.restoringHistory = true;
+      this.filterSelected = state.fi;
+      this.feedSelected = state.fe;
+      this.itemSelected = state.it;
+      this.$nextTick(() => {
+        this.restoringHistory = false;
+      });
+    },
+    historyChange() {
+      if (this.restoringHistory) return;
+      const state = this.navigationState;
+      const previous = history.state;
+      const url = `#filter:${state.fi || "all"},${state.fe || "feed:all"},item:${state.it || ""}`;
+      if (!isHistoryState(previous)) {
+        history.replaceState(state, "", url);
+      } else if (previous.fe !== state.fe || previous.it !== state.it || previous.fi !== state.fi) {
+        history.pushState(state, "", url);
+      }
     },
     changeRefreshRate(offset: number) {
       const curIdx = this.refreshRateOptions.findIndex(o => o.value === this.refreshRate);
